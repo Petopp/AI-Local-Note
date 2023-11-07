@@ -20,7 +20,8 @@ To run AI-Notes-Local on your system, you will need:
 
 - A PC or server with sufficient processing power and storage space
 - A modern web browser
-- Python < 3.10
+- Python > 3.10
+- Internet connection for download of language module
 - (comming!)
 
 ## Installation and Usage
