@@ -1,0 +1,62 @@
+.light-mode {
+    background-color: white;
+    color: black;
+  }
+  
+.dark-mode {
+    background-color: black;
+    color: white;
+  }
+  
+
+
+
+#sidebar {
+    width: 20%;
+    background-color: #f7f7f7;
+    padding: 20px;
+    box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
+}
+
+body.dark-mode #sidebar {
+  background-color: #333333; /* Dunkelgrauer Hintergrund für den Dunkelmodus */
+  color: #f7f7f7; /* Textfarbe im Dunkelmodus */
+  /* Weitere gewünschte Stile für den Dunkelmodus hier hinzufügen */
+}
+
+body.dark-mode .ql-toolbar {
+  background-color: #ffffff;  /* Dunklerer Grauton für die Toolbar */ /* Textfarbe für die Toolbar */
+}
+
+body.dark-mode .icon-button {
+  color: #f7f7f7; /* Ändert die Textfarbe zu Hellgrau */
+}
+
+body.dark-mode .icon-button:hover {
+  color: #ff0000; /* Ändert die Textfarbe zu einem mittleren Grauton */
+}
+
+body.light-mode .icon-button:hover {
+  color: #ff0000; /* Ändert die Textfarbe zu einem mittleren Grauton */
+}
+
+#sidebar {
+  width: 20%;
+  background-color: #f7f7f7;
+  padding: 20px;
+  box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
+  overflow-y: auto; /* Fügt eine vertikale Scrollbar hinzu, wenn der Inhalt überläuft */
+}
+#note-list-container {
+  max-height: calc(100vh - 120px); /* Begrenzt die maximale Höhe der Liste, um Platz für andere Elemente zu lassen */
+}
+
+#note-list li {
+  line-height: 1.5;
+  cursor: default;
+}
+
+#editor {
+  font-size: 16px;  /* Setzt die normale Schriftgröße auf 16px */
+  /* ... weitere Stile ... */
+}

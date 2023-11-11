@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI-Local-Note</title>
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" type="text/css" href="/static/styles.css">
+
+    <style>
+
+        body {
+            font-family: Arial, sans-serif, "Courier New";
+            margin: 0;
+            padding: 0;
+        }
+        #container {
+            display: flex;
+            flex-direction: row;  /* Zeile hinzugefügt */
+            height: 100vh;
+        }
+        #sidebar {
+            width: 20%;
+            background-color: #f7f7f7;
+            padding: 20px;
+            box-shadow: 2px 0px 5px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        #note-list-container {
+            max-height: calc(100vh - 120px);
+        }
+        
+        #note-list li {
+            line-height: 1.5;
+            cursor: default;
+        }
+
+        #note-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #button-bar {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        #button-bar button {
+            margin-left: 10px;
+        }
+        #editor {
+            height: 100%;
+        }
+
+        /* Stil für die Icon-Buttons */
+        .icon-button {
+            border: none;
+            background: none;
+            cursor: pointer;
+            font-size: 20px;
+            color: #333; /* Farbe der Icons */
+        }
+
+        .icon-button:hover {
+            color: #900; /* Farbe ändern, wenn Maus darüber schwebt */
+        }
+
+
+    </style>
+</head>
+<body class="light-mode"> 
+
+<div id="container">
+    <div id="sidebar">
+        <h3>AI-Local-Note</h3>
+
+        <p>
+            <!-- Suchbereich hinzugefügt -->
+            <div id="search-area">
+                <input type="text" id="search-box" placeholder="...">
+                
+            </div>
+            <!-- Suchbereich Ende -->
+        
+        </p>
+
+   
+        <p>
+            <input list="categories-datalist" id="category-search" placeholder="..." autocomplete="off">
+                <datalist id="categories-datalist">
+                    <!-- Optionen werden dynamisch hinzugefügt -->
+                </datalist> 
+            <button id="clear-button">Clear</button>
+        
+        </p>
+
+
+        <ul id="note-list">
+            <!-- Die Liste wird dynamisch gefüllt -->
+        </ul>
+    </div>
+    
+    <div id="note-content">
+ 
+        <div id="button-bar">
+
+                <input list="categories-datalist" id="category-input" placeholder="..." autocomplete="off">
+                <datalist id="categories-datalist">
+                    <!-- Optionen werden dynamisch hinzugefügt -->
+                </datalist>   
+                
+                <button id="new-button" class="icon-button"><i class="fas fa-plus"></i></button>
+                <button id="save-button" class="icon-button"><i class="fas fa-save"></i></button>
+                <button id="delete-button" class="icon-button"><i class="fas fa-trash-alt"></i></button>            
+        </div>
+        
+        <div id="editor"></div>
+        
+        <div id="note-id-display">ID: <span id="note-id"></span></div>
+    
+    </div>
+</div>
+
+
+<script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+<script>
+
+    // Leeren der Kategorie-Suche
+    document.getElementById("clear-button").addEventListener("click", function() {
+        document.getElementById("category-search").value = "";
+      });
+
+
+    // Code für den Dunkelmodus
+    window.addEventListener('load', function() {
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.body.className = 'dark-mode';
+        }
+
+        if (window.matchMedia) {
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(e) {
+                var newColorScheme = e.matches ? 'dark-mode' : 'light-mode';
+                var oldColorScheme = e.matches ? 'light-mode' : 'dark-mode';
+                document.body.classList.remove(oldColorScheme);
+                document.body.classList.add(newColorScheme);
+            });
+        }
+    
+    });
+    
+    function fetchCategories() {
+        fetch('/get_categories')
+            .then(response => response.json())
+            .then(data => {
+                const categories = data.categories;
+                const datalist = document.getElementById('categories-datalist');
+                datalist.innerHTML = '';  // sicherstellen, dass das datalist leer ist
+                categories.forEach(category => {
+                    const option = document.createElement('option');
+                    option.value = category;
+                    datalist.appendChild(option);
+                });
+            });
+    }
+
+
+    function setSelectedCategory(category) {
+        const dropdown = document.getElementById('category-select');
+        const options = dropdown.options;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].value === category) {
+                dropdown.selectedIndex = i;
+                break;
+            }
+        }
+    }
+
+  
+    // Funktion zum Aktualisieren der Notizenliste
+    function updateNoteList() {
+        fetch('/get_titles')
+        .then(response => response.json())
+        .then(data => {
+            let noteList = document.getElementById('note-list');
+            noteList.innerHTML = "";  // Liste leeren
+
+            // Sortieren der Titel in alphabetischer Reihenfolge
+            data.titles.sort((a, b) => a.ueberschrift.localeCompare(b.ueberschrift));
+
+
+            data.titles.forEach(title => {
+                let listItem = document.createElement('li');
+                listItem.textContent = title.ueberschrift;
+                listItem.dataset.id = title.id;  // Speichern der ID im HTML-Element für spätere Verwendung
+                listItem.addEventListener('click', function() {
+                    fetch('/get_note', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({id: this.dataset.id})
+                    }).then(response => response.json())
+                    .then(data => {
+                        quill.setContents([]);  // Editor leeren
+                        quill.clipboard.dangerouslyPasteHTML(data.content);  // Inhalt einfügen
+                        currentNoteID = this.dataset.id;  // Aktuelle ID aktualisieren
+                        document.getElementById('note-id').innerText = currentNoteID; 
+                        document.getElementById('category-input').value = data.category;// ID im Display aktualisieren
+                    });
+                });
+                noteList.appendChild(listItem);
+            });
+        });
+    }
+
+
+    // Aktualisieren der Liste beim Laden der Seite
+    window.onload = function() {
+        updateNoteList();
+        fetchCategories();
+    };
+
+    
+
+    // Funktion zur Generierung einer UUID
+    function generateUUID() {
+        return 'xxxxxxxx-xxxx-31xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0,
+                v = c === 'x' ? r : (r & 0x3 | 0x8);
+            return v.toString(16);
+        });
+    }
+
+    // Funktion zum Setzen einer neuen ID
+    function setNewID() {
+        const note_id = generateUUID();
+        document.getElementById('note-id').innerText = note_id;
+        return note_id;
+    }
+
+    // Setzen einer neuen ID beim Laden der Seite
+    let currentNoteID = setNewID();
+
+    // Setzen einer neuen ID beim Klicken auf "Neu"
+    document.getElementById('new-button').addEventListener('click', function() {
+        currentNoteID = setNewID();
+        quill.setContents([]);
+
+        // Suchfeld leeren und Notizenliste aktualisieren
+        document.getElementById('search-box').value = '';
+        document.getElementById('category-input').value = '';
+        updateNoteList();
+        fetchCategories();
+
+    });
+
+    var quill = new Quill('#editor', {
+        theme: 'snow'
+    });
+
+
+    // Speichern der Notiz mit der aktuellen ID und der Kategorie
+    document.getElementById('save-button').addEventListener('click', function() {
+        const content = quill.root.innerHTML;
+        
+        // In der "save-button" EventListener-Funktion:
+        const category = document.getElementById('category-input').value;
+
+        
+        fetch('/save', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({id: currentNoteID, content: content, category: category})
+        }).then(response => response.json())
+        .then(data => {
+            console.log(data);
+            updateNoteList();
+            fetchCategories();
+            
+        });
+    });
+
+
+    // Löschen der Notiz mit der aktuellen ID
+    document.getElementById('delete-button').addEventListener('click', function() {
+        if (window.confirm("Sind Sie sicher, dass Sie diese Notiz löschen möchten?")) {
+            fetch('/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({id: currentNoteID})
+            }).then(response => response.json())
+            .then(data => {
+                console.log(data);
+                updateNoteList();
+                fetchCategories();
+            });
+    
+            // Setzen einer neuen ID nach dem Löschen
+            currentNoteID = setNewID();
+            quill.setContents([]);
+
+             // Suchfeld leeren
+             document.getElementById('search-box').value = '';
+        }
+    });
+
+
+    // Suchfunktion
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchBox = document.getElementById('search-box');
+
+        searchBox.addEventListener('keyup', function(event) {
+            if (event.keyCode === 13) {  // 13 ist der KeyCode für die Enter-Taste
+                event.preventDefault();
+                
+                // AJAX Request zum Server
+                fetch("/search", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ search_term: searchBox.value }),
+                })
+                .then(response => response.json())
+                .then(data => {
+
+                     // Sortieren der Suchergebnisse in alphabetischer Reihenfolge
+                    data.results.sort((a, b) => a.ueberschrift.localeCompare(b.ueberschrift));
+
+
+                    // Verarbeiten der Antwort vom Server
+                    let noteList = document.getElementById('note-list');
+                    noteList.innerHTML = "";  // Liste leeren
+                    data.results.forEach(result => {
+                        let listItem = document.createElement('li');
+                        listItem.textContent = result.ueberschrift;
+                        listItem.dataset.id = result.id;  // Speichern der ID im HTML-Element für spätere Verwendung
+                        
+                        // Event-Listener hinzufügen, um die Notiz im Editor zu laden
+                        listItem.addEventListener('click', function() {
+                            fetch('/get_note', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({id: this.dataset.id})
+                            }).then(response => response.json())
+                            .then(data => {
+                                quill.setContents([]);  // Editor leeren
+                                quill.clipboard.dangerouslyPasteHTML(data.content);  // Inhalt einfügen
+                                currentNoteID = this.dataset.id;  // Aktuelle ID aktualisieren
+                                document.getElementById('note-id').innerText = currentNoteID;  // ID im Display aktualisieren
+                                
+                                document.getElementById('category-input').value = data.category;
+
+                               
+                            });
+                        });
+                        
+                        noteList.appendChild(listItem);
+                    });
+                });
+            }
+        });
+    });
+
+
+     
+</script>
+
+</body>
+</html>
