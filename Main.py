@@ -1,9 +1,23 @@
-from flask import Flask, request, jsonify, render_template
+import streamlit as st
 import sqlite3
-import NLP 
+import time
 
 
-app = Flask(__name__)
+if 'current_category_index' not in st.session_state:
+    st.session_state['current_category_index'] = 0
+
+if 'current_note_id' not in st.session_state:
+    st.session_state['current_note_id'] = ""
+            
+            
+# Kategorie abrufen aus der DB
+def get_categories():
+    with sqlite3.connect('notes.db') as conn:
+        note = conn.cursor()
+        note.execute("SELECT DISTINCT kategorie FROM notizen")
+        categories = [row[0] for row in note.fetchall()]
+    return categories
+    
 
 # Datenbankverbindung
 conn = sqlite3.connect('notes.db')
@@ -18,181 +32,185 @@ note.execute('''
           kategorie TEXT)
           ''')
 
-# Änderung speichern
-conn.commit()
 
+# Webseite Konfiguration
+st.set_page_config(page_title="AI-Local-Note", page_icon="icons\Icon_Note.png", layout="wide", initial_sidebar_state="auto", menu_items=None)
 
-@app.route("/", methods=['GET'])
-def index():
-    return render_template('index.html')
-
-
-# Bestehende Notiz abrufen
-@app.route('/get_note', methods=['POST'])
-def get_note():
-    note_id = request.json['id']
+# DEV hide
+st.markdown("""
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
     
+    .reportview-container .main .block-container{padding-top: 0px;}
+    header {visibility: hidden;}
+    
+    .vertical-align {
+        display: flex;
+        align-items: center;
+    }
+    
+    .custom-button {
+        width: 70%;
+        height: 40px; /* Höhe entsprechend anpassen */
+        padding: 8px;
+        margin: 30px;
+        color: white;
+        background-color: olive;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .custom-button:hover {
+        background-color: darkkhaki;
+    }
+    
+    .custom-button2 {
+        width: 70%;
+        height: 40px; /* Höhe entsprechend anpassen */
+        padding: 8px;
+        margin: 30px;
+        color: white;
+        background-color: darkred;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .custom-button2:hover {
+        background-color: red;
+    }
+
+    .custom-button3 {
+        width: 70%;
+        height: 40px; /* Höhe entsprechend anpassen */
+        padding: 8px;
+        margin: 30px;
+        color: white;
+        background-color: darkgreen;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+    .custom-button3:hover {
+        background-color: green;
+    }
+    
+    </style>
+    """, unsafe_allow_html=True)
+
+# Header, Bild und Text Nebeneinander
+Header=st.subheader('AI-Local-Note')
+st.write("___")
+
+# Sidebar Navigation mit Suche
+st.sidebar.title("Navigation")
+search = st.sidebar.text_input("Search", "")
+st.sidebar.write("___")
+
+# Kategorie Auswahl
+category = st.sidebar.selectbox("Select a category", get_categories(), index=0)
+st.sidebar.write("___")
+
+
+
+# Definieren Sie die Höhe des Platzhalters
+placeholder_height = 10
+
+col1, col2, col3,col4 = st.columns([3, 1,1, 1])
+
+with col1:
+    Kateogrie_Box = st.empty()
+    Kateogrie_Box.selectbox("Category", ["Option 1", "Option 2"], index=0)
+
+with col2:
+    # Benutzerdefinierter Button mit HTML
+    new_button_html = '<button class="custom-button3" onclick="alert(\'New!\')">New</button>'
+    new_button=st.markdown(new_button_html, unsafe_allow_html=True)
+
+with col3:
+    # Benutzerdefinierter Button mit HTML
+    save_button_html = '<button class="custom-button" onclick="alert(\'Saved!\')">Save</button>'
+    save_button=st.markdown(save_button_html, unsafe_allow_html=True)
+
+with col4:
+    # Benutzerdefinierter Button mit HTML
+    delete_button_html = '<button class="custom-button2" onclick="alert(\'Deleted!\')">Delete</button>'
+    delete_button=st.markdown(delete_button_html, unsafe_allow_html=True)
+    
+
+
+# Editor
+Text=st.empty()
+Text.text_area("Text", "", height=600)
+
+
+# Erstellen Sie einen Platzhalter
+ID_Code = st.empty()
+# Schreiben Sie einen initialen Wert in den Platzhalter
+ID_Code.write("-")
+
+
+# Reagrien auf Kategorie Auswahl
+if category:
+    # Bestehende Notiz abrufen und mit Radio anzeigen
     with sqlite3.connect('notes.db') as conn:
         note = conn.cursor()
-        note.execute("SELECT text, kategorie FROM notizen WHERE id = ?", (note_id,))
-        row = note.fetchone()
-        
-        if row:
-            content, kategorie = row  # Zerlege die Zeile in ihre Bestandteile
-            print ("Abrufen",note_id+"#",kategorie)
-            return jsonify({"content": content, "category": kategorie}), 200
-        else:
-            return jsonify({"message": "Note not found"}), 404
-
-        
-
-
-# Neue Notiz erstellen
-@app.route("/new", methods=['POST'])
-def new_note():
-    print ("Neu")
-    return jsonify({"message": "New contened"}), 200
-
-
-# Title lesen
-@app.route("/get_titles", methods=['GET'])
-def get_titles():
-    titles = []
-    with sqlite3.connect('notes.db') as conn:
-        note = conn.cursor()
-        note.execute("SELECT id, ueberschrift FROM notizen")
+        note.execute("SELECT id, ueberschrift FROM notizen WHERE kategorie = ?", (category,))
         rows = note.fetchall()
-        for row in rows:
-            titles.append({"id": row[0], "ueberschrift": NLP.Überschift_erzeugen(row[1])})
-    return jsonify({"titles": titles}), 200
+
+        # Falls Ergebnisse vorhanden sind
+        if rows:
+            # Erstelle eine Liste der Überschriften
+            ueberschriften = [row[1] for row in rows]
+            # Erstelle Radiobuttons für jede Überschrift
+            selected_ueberschrift = st.sidebar.radio("Select a note", ueberschriften)
+
+# Reagiere auf die Auswahl
+if selected_ueberschrift:
+    
+    selected_id = next(row[0] for row in rows if row[1] == selected_ueberschrift)
+
+    # Führe eine weitere Abfrage aus, um die Details der ausgewählten Notiz zu erhalten
+    note.execute("SELECT * FROM notizen WHERE id = ?", (selected_id,))
+    selected_note = note.fetchone()
+    
+    # Zeige Details der ausgewählten Notiz
+    if selected_note:
+        ID_Code.write("ID: "+str(selected_note[0]))
+        Text.text_area("Text", selected_note[2], height=600)
+        
+        st.session_state['current_note_id'] = str(selected_note[0])
+
+        current_categories = get_categories()                   
+        current_category = selected_note[4]    
+        st.session_state['current_category_index'] = current_categories.index(current_category)
+        
+        
+        # Kateogrie Text wie Auch auswahl nebeneinander
+        Kateogrie_Box.selectbox("Category", current_categories, index=st.session_state['current_category_index'])
 
 
-# Speichern der Daten in der Datenbank
-@app.route("/save", methods=['POST'])
-def save_note():
-    data = request.json
-    note_id = data['id']
-    content = data['content']
-    kategorie = data['category']
-    print(note_id,kategorie)
-
-    # Die erste Zeile als Titel nehmen
+## Neu
+if new_button_html:
     
     
-    titel = NLP.Überschift_erzeugen(content)
     
-
-    with sqlite3.connect('notes.db') as conn:
-        note = conn.cursor()
-        
-        # Überprüfen, ob die Notiz bereits existiert
-        note.execute("SELECT * FROM notizen WHERE id = ?", (note_id,))
-        existing_note = note.fetchone()
-        
-        if existing_note:
-            # Notiz aktualisieren
-            note.execute("UPDATE notizen SET ueberschrift = ?, text = ?, text2 = ?, kategorie = ? WHERE id = ?", 
-                    (titel, content, NLP.Umwandeln(content), kategorie, note_id))
-        else:
-            # Neue Notiz einfügen
-            note.execute("INSERT INTO notizen (id, ueberschrift, text, text2, kategorie) VALUES (?, ?, ?, ?, ?)", 
-                    (note_id, titel, content, NLP.Umwandeln(content), kategorie))
-
-        # Änderung speichern
-        conn.commit()
-        
-    return jsonify({"message": "Note saved successfully"}), 200
+    pass
 
 
-
-
-# Löschen der Datenbank
-@app.route("/delete", methods=['POST'])
-def delete_note():
+## Speichern
+if save_button_html:
     
-    data = request.json
-    note_id = data['id']
     
-    print("Löschen",note_id+"#")
+    # Änderung speichern
+    conn.commit()
+    pass    
+
+
+## Löschen der Notiz
+if delete_button_html:
     
-    with sqlite3.connect('notes.db') as conn:
-        note = conn.cursor()
-        
-        # Überprüfen, ob die Notiz bereits existiert
-        note.execute("SELECT * FROM notizen WHERE id = ?", (note_id,))
-        existing_note = note.fetchone()
-        
-        if existing_note:
-            # Notiz löschen
-            note.execute("DELETE FROM notizen WHERE id = ?", (note_id,))
-            conn.commit()
-            
-            print ("Gefunden")
-            return jsonify({"message": "Note deleted successfully"}), 200
-        else:
-            print ("Nicht gefunden")
-            return jsonify({"message": "Note not found"}), 404
-
-
-# Suche 
-@app.route("/search", methods=['POST'])
-def search_note():
-    search_term = request.json['search_term']
-    print ("Suche", search_term+"#")
     
-    # Überprüfen, ob der Suchbegriff leer ist
-    if not search_term.strip():
-        results = []
-        with sqlite3.connect('notes.db') as conn:
-            note = conn.cursor()
-            note.execute("SELECT id, ueberschrift FROM notizen")
-            rows = note.fetchall()
-            for row in rows:
-                results.append({"id": row[0], "ueberschrift": NLP.Überschift_erzeugen(row[1])})
-        
-    else:
-        results = []
-        
-        with sqlite3.connect('notes.db') as conn:
-            note = conn.cursor()
-            
-            # Suche in der Datenbank
-            note.execute("""
-                SELECT id, ueberschrift, text, text2 
-                FROM notizen 
-                WHERE ueberschrift LIKE ? OR text LIKE ? OR text2 LIKE ?
-            """, ('%' + search_term + '%', '%' + search_term + '%', '%' + search_term + '%'))
-            
-            rows = note.fetchall()
-            
-            for row in rows:
-                results.append({
-                    "id": row[0], 
-                    "ueberschrift": NLP.Überschift_erzeugen(row[1]),
-                })
-        
-    return jsonify({"results": results}), 200
-
-
-# Kategrorie abrufen aus der DB
-@app.route("/get_categories", methods=['GET'])
-def get_categories():
-    with sqlite3.connect('notes.db') as conn:
-        note = conn.cursor()
-        note.execute("SELECT DISTINCT kategorie FROM notizen")
-        categories = [row[0] for row in note.fetchall()]
-    print (categories)
-    return jsonify({"categories": categories}), 200
-
-
-
-
-
-
-
-
-
-if __name__ == "__main__":
-    app.run(port=5000, threaded=True)
-
-
+    # Änderung speichern
+    conn.commit()
+    pass
